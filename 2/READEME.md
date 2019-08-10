@@ -136,3 +136,39 @@ Node 的核心模块再编译成可执行文件的过程中被编译进了二进
       - node_extensions.h 文件将这些散列的内建模块统一放进了一个叫 node_module_list 的数组中，这些模块有 node_buffer、node_crypto、node_evals...
       - Node 提供了 get_builtin_module() 方法从 node_module_list 数组中取出这些模块。
       - 内建模块的优势在于：首先，它们本身由 C/C++ 编写，性能上优于脚本语言；其次，在进行文件编译时，它们被编译进二进制文件。一旦 Node 开始执行，它们被直接加载进内存中，无须再次做标识符定位、文件定位、编译等过程，直接就可执行。
+    - 内建模块的导出
+      - 在 Node 的所有模块类型中，依赖关系是这样的：文件模块 -> 核心模块（Javascript）-> 内建模块（C/C++）
+      - 通常不推荐文件模块直接调用内建模块。如需调用，直接调用核心模块即可，因为核心模块中基本都封装了内建模块。
+      - Node 在启动时，会生成一个全局变量 process，并提供 Binding() 方法来协助加载内建模块。
+      - 在加载内建模块时，我们先创建一个 exports 空对象，然后调用 get_builtin_module() 方法取出内建模块对象，通过执行 register_func() 填充 exports 对象，最后将 exports 对象按模块名缓存，并返回给调用方完成导出。
+    - 核心模块的引入流程
+      - require('os');
+      - NativeModule.require('os');
+      - process.binding('os');
+      - get_builtin_module('node_os');
+      - NODE_MODULE(node_os, reg_func);
+    - 编写核心模块：略
+
+## C/C++ 扩展模块
++ Javascript 一个典型弱点就是位运算（Javascript 中只有 double 型的数据类型，进行位运算时先转换为 int 型）。
++ 位运算：程序中的所有数在计算机内存中都是以二进制的形式储存的。 位运算就是直接对整数在内存中的二进制位进行操作。 比如，and运算本来是一个逻辑运算符，但整数与整数之间也可以进行and运算。
++ 在应用中，会频繁出现位运算的需求，包括转码、编码等过程，如果通过 Javascript 来实现，CPU 资源将会耗费很多，这时可以通过编写 C/C++ 扩展模块来提升性能。
++ 扩展模块在不同平台式的编译和加载过程
+  + *nix：C/C++ 源码 -> g++/gcc（编译源码） -> .so 文件（生成 .node 文件）-> 加载 .so 文件（后缀为 .so，其实内部是 .node） -> dlopen() 加载 -> 导出给 Javascript
+  + *nix：C/C++ 源码 -> VC++（编译源码） -> .dll 文件（生成 .node 文件）-> 加载 .dll 文件（后缀为 .dll，其实内部是 .node） -> dlopen() 加载 -> 导出给 Javascript
++ 前提条件
+  + GYP 项目生成工具：跨平台项目生成器。
+  + V8 引擎 C++ 库：V8 是 Node 自身的动力来源之一。它自身由 C++ 写成，可以实现 Javascript 和 C++ 的互相调用。
+  + libuv 库：它是 Node 自身的动力来源之二。Node 能够实现跨平台的一个诀窍就是它的 libuv 库，这个库是跨平台的一些封装，通过它去调用一些底层操作，比自己在其他平台下编写实现要高效的多。libuv 封装的功能包括事件循环、文件操作等。
+  + Node 内部库：写 C++ 模块时，免不了要做一些面向对象的编程工作，而 Node 自身提供了一些 C++ 代码，比如 node::ObjectWrap 类可以用来包装你的自定义类，它可以帮助实现对象回收等工作。
+  + 其他库：其他存在 deps 目录下的库在编写扩展模块时也许可以帮助你，比如 zlib、openssl、http_parser 等。
++ C/C++ 扩展模块的编写
+  + 普通的扩展模块与内建模块的区别自安于无须将源代码编译进 Node，而是通过 dlopen() 方法动态加载。
+  + 由于不像编写内建模块那样将对象声明到 node_module_list 链表中，所以无法被认作是一个原生模块，只能通过 dlopen() 来动态加载，然后导出给 Javascript 调用。
++ C/C++ 扩展模块的编译
+  + 通过 GYP 工具，编译过程会根据平台不同，分别通过 make 和 vcbuild 进行编译。编译完成后，[name].node 文件会生成在 build/Release 目录下。
++ C/C++ 扩展模块的加载
+  + require() -> 路径分析 -> 文件定位 -> 编译执行；
+  + 对于以 .node 扩展名的文件，Node 将会调用 process.dlopen() 方法去加载文件；
+  + Javascript：require('./hello.node') -> 原生模块：process.dlopen('./hello.node', exports) -> libuv:uv_dlopen()、uv_dlsym() -> *nix：dlopen()、dlsym() / Windows：LoadLibraryExW()、GetProcAddress()
++ C/C++ 扩展模块与 Javascript 模块的区别在于加载之后不需要编译，直接执行之后就可以被外部调用了，其加载速度比 Javascript 模块略快。
