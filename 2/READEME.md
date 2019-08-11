@@ -172,3 +172,43 @@ Node 的核心模块再编译成可执行文件的过程中被编译进了二进
   + 对于以 .node 扩展名的文件，Node 将会调用 process.dlopen() 方法去加载文件；
   + Javascript：require('./hello.node') -> 原生模块：process.dlopen('./hello.node', exports) -> libuv:uv_dlopen()、uv_dlsym() -> *nix：dlopen()、dlsym() / Windows：LoadLibraryExW()、GetProcAddress()
 + C/C++ 扩展模块与 Javascript 模块的区别在于加载之后不需要编译，直接执行之后就可以被外部调用了，其加载速度比 Javascript 模块略快。
+
+## 模块调用栈
++ C/C++ 内建模块属于最底层的模块，它属于核心模块，主要提供 API 给 Javascript 核心模块和第三方 Javascript 文件模块调用。如果你不是非常了解要调用的 C/C++ 内建模块，请尽量避免通过 process.binding() 方法直接调用，这是不推荐的。
++ Javascript 核心模块主要扮演的职责有两类：一类是作为 C/C++ 内建模块的封装层和桥阶层，供文件模块调用；一类是纯粹的功能模块，它不需要和底层打交道，但是又十分重要。
++ 文件模块通常由第三方编写，包括普通 Javascript 模块和 C/C++ 扩展模块，主要调用方向为普通 Javascript 模块调用扩展模块。
+
+## 包与 NPM
+CommonJS 包规范是理论，NPM 是其中的一种实践。NPM 之于 Node，相当于 gem 之于 Ruby，pear 之于 PHP。
++ 包结构（完全符合 CommonJS 规范的包目录应该包含如下这些文件）
+  + package.json：包描述文件；
+  + bin：用于存放可执行二进制文件的目录；
+  + lib：用于存放 Javascript 代码的目录；
+  + doc：用于存放文档的目录；
+  + test：用于存放单元测试用例的代码；
++ 包描述文件的属性（package.json）
+  + name：包名。由小写的字母和数字组成；
+  + description：包简介；
+  + version：版本号；
+  + keywords：关键词数组，NPM 中主要用来做分类搜索。一个好的关键词数组有利于用户快速找到你编写的包；
+  + maintainers：包维护者列表。每个维护者由name、email 和 web 这3个属性组成；
+  + contributors：贡献者列表；
+  + bugs：一个可以反馈 bug 的网页地址或邮件地址；
+  + licenses：许可证列表；
+  + repositories：托管源代码的位置列表；
+  + dependencies：使用当前包所需要的包列表，NPM 会通过这个属性帮助自动加载依赖的包；
+  + homepage：当前包的网站地址；
+  + os：操作系统支持列表；
+  + cpu：CPU 架构的支持列表；
+  + engine：支持的 Javascript 引擎列表；
+  + builtin：标志当前包是否是内建在底层系统的标准组件；
+  + directories：包目录说明；
+  + implements：实现规范的列表；
+  + scripts：脚本说明对象。
+  + author：包作者；
+  + bin：一些包作者希望包可以作为命令行工具使用。配置好 bin 字段后，通过 npm install package_name -g 命令可以将脚本添加到执行路径中，之后可以在命令行直接执行。
+  + main：模块引入方法 require() 在引入包时，会优先检查这个字段，并将其作为包中其余模块的入口。
+  + devDependencies：一些模块只在开发时需要依赖；
++ NPM 常用功能
+  + 全局安装：npm install package_name -g；-g 是将一个包安装为全局可用的可执行命令，并不意味着可以从任何地方通过 require() 来引用到它；
++ 对于企业内部而言，私有的可重用模块可以打包到局域网 NPM 仓库中，这样可以保持更新的中心化，不至于让各个小项目各自维护相同功能的模块，杜绝通过复制粘贴实现代码共享的行为。
