@@ -78,7 +78,11 @@
   + 每次调用 process.nextTick() 方法，只会将回调函数放入队列中，在下一轮 Tick 时取出执行，定时器中采用红黑树的操作时间复杂度为 O(lg(n))，nextTick() 的时间复杂度为 O(1)。相较之下，process.nextTick() 更高效。
 + setImmediate()
   + process.nextTick() 中的回调函数执行的优先级要高于 setImmediate()。这里的原因在于事件循环对观察者的检查是有先后顺序的，process.nextTick() 属于 idle 观察者，setImmediate() 属于 check 观察者。在每一轮循环检查中，idle 观察者先与 I/O 观察者，I/O 观察者先于 check 观察者。
-  + 在具体表现上，process.nextTick() 的回调函数保存在一个数组里，setImmediate() 的结果则是保存在链表上。在行为上，process.nextTick() 在每轮循环中会将数组中的回调函数全部执行完，而 setImmediate() 在每轮循环中执行链表中的一个回调函数。之所以这样设计，是为了保证每轮循环能够尽快地执行结束，防止 CPU 占用过多而阻塞后续 I/O 调用的情况。
+  + 在具体表现上，process.nextTick() 的回调函数保存在一个数组里，setImmediate() 的结果则是保存在链表上。在行为上，process.nextTick() 在每轮循环中会将数组中的回调函数全部执行完，而 setImmediate() 在每轮循环中执行链表中的一个回调函数。之所以这样设计，是为了保证每轮循环能够尽快地执行结束，防止 CPU 占用过多而阻塞后续 I/O 调用的情况。（新版本中已经不是链表形式，新版本中与 setTimeout 基本一致，process.nextTick 已经无法插入）
 + 执行顺序：同步函数（当前 tick） > process.nextTick（idle 观察者） > Promise（I/O 观察者） > setTimeout(callback, 0)（定时器红黑树检查，check 观察者） > setImmediate（check 观察者）
 
 ## 事件驱动与高性能服务器
++ 事件驱动的实质，即通过主循环加事件触发的方式来运行程序。
++ 对于网络套接字的处理，Node 也应用到了异步 I/O，网络套接字侦听到的请求都会形成直接交给 I/O 观察者。事件循环会不停地处理这些网络 I/O 事件。如果 Javascript 有传入回调函数，这些事件将会最终传递到业务逻辑层进行处理。
++ Node 通过事件驱动的方式处理请求，无须为每一个请求创建额外的对应线程，可以省掉创建线程和销毁线程的开销。
++ Nginx 也摒弃了多线程的方式，采用了和 Node 相同的事件驱动。Nginx 采用纯 C 写成，性能较高，但是它仅适合于做 Web 服务器，用于反向代理或负载均衡等服务，在处理具体业务方面较为欠缺。

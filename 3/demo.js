@@ -1,17 +1,19 @@
-setImmediate(() => {
-  console.log(3);
-});
-
-setTimeout(() => {
-  console.log(1);
-});
-
-process.nextTick(() => {
-  console.log(2);
-});
-
-new Promise(resolve => resolve()).then(() => console.log(4));
-
-console.log(5);
-
-// 5 2 4 1 3
+// 加入ଇ߲nextTick()的回调函数
+process.nextTick(function () {
+  console.log('nextTickჽ׿执行1');
+ });
+ process.nextTick(function () {
+  console.log('nextTickჽ׿执行2');
+ });
+ // 加入ଇ߲setImmediate()的回调函数
+ setImmediate(function () {
+  console.log('setImmediateჽ׿执行1');
+  // 进入ူْ循环
+  process.nextTick(function () {
+  console.log('ഽ势֭入');
+  });
+ });
+ setImmediate(function () {
+  console.log('setImmediateჽ׿执行2');
+ });
+ console.log('正常执行'); 
