@@ -1,31 +1,65 @@
 const events = require("events");
 
-function MyPromise(fn) {
+function MyPromise(func) {
   this.events = new events.EventEmitter();
-  this.fn = fn;
+  this.func = func;
+  this.queue = [];
+  this.addSuccessHandler();
   return this.execute();
+}
+
+MyPromise.prototype.addSuccessHandler = function() {
+  this.events.on("success", data => {
+    const handler = this.queue.shift();
+    if (!handler) return;
+    const func = handler(data);
+
+    if (func instanceof MyPromise) {
+      func.then(data => {
+        this.events.emit("success", data);
+      });
+    }
+  });
 }
 
 MyPromise.prototype.execute = function() {
   const resolve = data => this.events.emit("success", data);
   const reject = error => this.events.emit("fail", error);
-  fn(resolve, reject);
+  this.func(resolve, reject);
   return this;
 };
 
 MyPromise.prototype.then = function(success) {
-  this.events.once("success", success);
+  this.queue.push(success);
   return this;
 };
 
 const fn = resolve => {
   setTimeout(() => {
-    const data = "Test";
-    resolve(data);
-  }, 1000);
+    const n = 100;
+    resolve(n);
+  }, 500);
 };
 
-new MyPromise(fn).then(data => {
-  console.log({ data });
-  return 10;
+new MyPromise(fn).then(n1 => {
+  console.log({ n1 });
+  return new MyPromise(resolve => {
+    setTimeout(() => {
+      resolve(n1 * 100);
+    }, 1000);
+  });
+}).then(n2 => {
+  console.log({ n2 });
+  return new MyPromise(resolve => {
+    setTimeout(() => {
+      resolve(n2 * 100);
+    }, 1000);
+  });
+}).then(n3 => {
+  console.log({ n3 });
+  return new MyPromise(resolve => {
+    setTimeout(() => {
+      resolve(n3 * 100);
+    }, 1000);
+  });
 });
